@@ -1,5 +1,8 @@
 const { Sequelize } = require("sequelize");
 
+// Explicitly require pg to ensure it's included in Vercel build
+const pg = require("pg");
+
 const { DATABASE_URL } = process.env;
 
 if (!DATABASE_URL) {
@@ -8,6 +11,7 @@ if (!DATABASE_URL) {
 
 const sequelize = new Sequelize(DATABASE_URL, {
   dialect: "postgres",
+  dialectModule: pg, // Explicitly set the dialect module
   logging: false,
   dialectOptions: {
     ssl: {

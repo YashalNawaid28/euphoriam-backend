@@ -6,7 +6,11 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node index.js",
-    "dev": "nodemon index.js"
+    "dev": "nodemon index.js",
+    "vercel-build": "echo 'Building for Vercel'"
+  },
+  "engines": {
+    "node": ">=18.x"
   },
   "repository": {
     "type": "git",
