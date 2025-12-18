@@ -1,45 +1,55 @@
 require("dotenv").config();
 const app = require("./src/app");
-const { initDb } = require("./src/config/sequelize");
+const { sequelize } = require("./src/config/sequelize");
 
 const PORT = process.env.PORT || 3000;
 
-// Initialize database once
-let dbInitialized = false;
-let dbInitPromise = null;
+// Initialize database connection lazily for serverless
+let dbConnected = false;
 
-const ensureDbInitialized = async () => {
-  if (dbInitialized) {
-    return;
+const ensureDbConnected = async () => {
+  if (!dbConnected) {
+    try {
+      await sequelize.authenticate();
+      console.log("Database connection established");
+      
+      // Register models and associations
+      const models = require("./src/models");
+      if (models.applyAssociations) {
+        models.applyAssociations();
+      }
+      
+      // Don't sync in production serverless - tables should already exist
+      if (process.env.NODE_ENV !== "production") {
+        await sequelize.sync();
+        console.log("Database synced");
+      }
+      
+      dbConnected = true;
+    } catch (err) {
+      console.error("Database connection failed:", err);
+      throw err;
+    }
   }
-  if (!dbInitPromise) {
-    dbInitPromise = initDb()
-      .then(() => {
-        dbInitialized = true;
-        console.log("Database initialized successfully");
-      })
-      .catch((err) => {
-        console.error("Failed to initialize database:", err);
-        dbInitPromise = null; // Reset so it can retry
-        throw err;
-      });
-  }
-  return dbInitPromise;
 };
 
-// For serverless (Vercel)
+// Middleware to ensure DB is connected before handling requests
 app.use(async (req, res, next) => {
   try {
-    await ensureDbInitialized();
+    await ensureDbConnected();
     next();
   } catch (err) {
-    console.error("Database initialization error:", err);
-    res.status(500).json({ error: "Database connection failed" });
+    console.error("Database error:", err.message);
+    res.status(500).json({ 
+      error: "Database connection failed",
+      message: process.env.NODE_ENV === "development" ? err.message : undefined
+    });
   }
 });
 
 // For local development
 if (require.main === module) {
+  const { initDb } = require("./src/config/sequelize");
   initDb()
     .then(() => {
       app.listen(PORT, () => {
